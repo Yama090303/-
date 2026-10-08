@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#111827">
+<title>機材管理</title>
+<style>
+*{box-sizing:border-box} body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Hiragino Sans","Yu Gothic",sans-serif;background:#f5f7fa;color:#111827}
+.app{min-height:100vh;display:flex;flex-direction:column}.header{padding:28px 20px 12px;text-align:center;font-size:25px;font-weight:800}
+.content{flex:1;padding:22px 20px;display:flex;flex-direction:column;align-items:center}
+.qrbtn{margin-top:90px;width:min(330px,90vw);height:190px;border:0;border-radius:28px;background:#111827;color:white;font-size:24px;font-weight:800;box-shadow:0 12px 30px #0002}
+.qrbtn:active,.btn:active,.admin:active{transform:scale(.98)}
+.qr{font-size:58px;display:block;margin-bottom:12px}.sub{font-size:13px;opacity:.65;margin-top:10px}
+.admin{margin:18px auto 28px;border:0;background:transparent;color:#6b7280;font-size:13px;padding:12px 18px}
+.view{width:100%;max-width:520px}.back{border:0;background:none;font-size:15px;padding:8px 0;color:#374151}
+.card{background:white;border-radius:20px;padding:20px;margin-top:12px;box-shadow:0 5px 18px #0000000d}.title{font-size:21px;font-weight:800}.code{font-size:13px;color:#6b7280;margin-top:4px}
+label{display:block;font-size:14px;font-weight:700;margin:18px 0 7px}input{width:100%;padding:15px;border:1px solid #d1d5db;border-radius:12px;font-size:16px}
+.btn{width:100%;border:0;border-radius:13px;padding:16px;margin-top:18px;font-size:16px;font-weight:800;background:#111827;color:white}.btn.return{background:#374151}
+.small{font-size:13px;color:#6b7280;line-height:1.6}.status{padding:12px;border-radius:12px;background:#f3f4f6;margin-top:14px}
+.list button{width:100%;text-align:left;border:0;background:white;padding:17px;border-bottom:1px solid #eee;font-size:16px}.list button:first-child{border-radius:15px 15px 0 0}.list button:last-child{border-radius:0 0 15px 15px;border-bottom:0}
+.hidden{display:none}.success{font-size:44px;text-align:center}.center{text-align:center}
+.pin{letter-spacing:5px;text-align:center}.notice{padding:12px;background:#fff7ed;border-radius:12px;color:#9a3412;font-size:13px;margin-top:12px}
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="header">🔧 機材管理</div>
+
+  <main class="content">
+    <section id="home" class="view">
+      <button class="qrbtn" onclick="scan()"><span class="qr">📷</span>QRコードを読み取る</button>
+      <div class="sub">機材のQRコードから貸出・返却を行います</div>
+    </section>
+
+    <section id="scan" class="view hidden">
+      <button class="back" onclick="show('home')">‹ 戻る</button>
+      <div class="card">
+        <div class="title">📷 QRコードを読み取り</div>
+        <p class="small">スマホ版のテストでは、下から機材を選択できます。</p>
+        <div class="list">
+          <button onclick="selectEq('KZ-001','水中ライト')">🔦 水中ライト <span class="small">KZ-001</span></button>
+          <button onclick="selectEq('KZ-002','発電機')">⚡ 発電機 <span class="small">KZ-002</span></button>
+          <button onclick="selectEq('KZ-003','送気ホース')">〰️ 送気ホース <span class="small">KZ-003</span></button>
+        </div>
+      </div>
+    </section>
+
+    <section id="equipment" class="view hidden">
+      <button class="back" onclick="show('scan')">‹ 機材選択に戻る</button>
+      <div class="card">
+        <div class="title" id="eqName"></div><div class="code" id="eqCode"></div>
+        <div id="loanForm"></div>
+      </div>
+    </section>
+
+    <section id="adminPin" class="view hidden">
+      <button class="back" onclick="show('home')">‹ 戻る</button>
+      <div class="card">
+        <div class="title">🔐 管理者</div>
+        <p class="small">管理者パスコードを入力してください。</p>
+        <input id="pin" class="pin" type="password" inputmode="numeric" maxlength="8" placeholder="••••">
+        <button class="btn" onclick="login()">管理者画面へ</button>
+        <div id="pinError"></div>
+      </div>
+    </section>
+
+    <section id="admin" class="view hidden">
+      <button class="back" onclick="show('home')">‹ 戻る</button>
+      <div class="card">
+        <div class="title">管理者画面</div>
+        <p class="small">ここは管理者だけが操作する画面です。</p>
+        <div id="dashboard"></div>
+        <button class="btn" onclick="resetData()">テストデータをリセット</button>
+      </div>
+    </section>
+  </main>
+
+  <button class="admin" onclick="show('adminPin')">管理者</button>
+</div>
+
+<script>
+const KEY='kizai_demo_v1';
+const initial={
+ "KZ-001":{name:"水中ライト",loan:null},
+ "KZ-002":{name:"発電機",loan:null},
+ "KZ-003":{name:"送気ホース",loan:null}
+};
+let data=JSON.parse(localStorage.getItem(KEY)||'null')||structuredClone(initial);
+let current=null;
+function save(){localStorage.setItem(KEY,JSON.stringify(data))}
+function show(id){document.querySelectorAll('.view').forEach(x=>x.classList.add('hidden'));document.getElementById(id).classList.remove('hidden');window.scrollTo(0,0)}
+function scan(){show('scan')}
+function selectEq(code,name){
+ current=code; document.getElementById('eqName').textContent=data[code].name;
+ document.getElementById('eqCode').textContent=code;
+ renderEquipment(); show('equipment');
+}
+function renderEquipment(){
+ const e=data[current], box=document.getElementById('loanForm');
+ if(!e.loan){
+  box.innerHTML=`<label>現場名</label><input id="site" placeholder="例：函館港○○工事">
+  <label>借りる人の名前</label><input id="borrower" placeholder="氏名を入力">
+  <button class="btn" onclick="lend()">貸出する</button>`;
+ }else{
+  const t=new Date(e.loan.time).toLocaleString('ja-JP');
+  box.innerHTML=`<div class="status">📍 現場：${esc(e.loan.site)}<br>👤 借りた人：${esc(e.loan.borrower)}<br>🕒 貸出：${t}</div>
+  <label>返却した人の名前</label><input id="returner" placeholder="氏名を入力">
+  <button class="btn return" onclick="ret()">返却する</button>`;
+ }
+}
+function lend(){
+ const site=document.getElementById('site').value.trim(), borrower=document.getElementById('borrower').value.trim();
+ if(!site||!borrower){alert('現場名と名前を入力してください');return}
+ data[current].loan={site,borrower,time:new Date().toISOString()};
+ save(); alert('貸出を記録しました'); renderEquipment();
+}
+function ret(){
+ const r=document.getElementById('returner').value.trim(); if(!r){alert('返却した人の名前を入力してください');return}
+ data[current].loan=null; save(); alert('返却を記録しました'); renderEquipment();
+}
+function login(){
+ if(document.getElementById('pin').value==='1234'){document.getElementById('pin').value='';document.getElementById('pinError').innerHTML='';renderAdmin();show('admin')}
+ else document.getElementById('pinError').innerHTML='<div class="notice">パスコードが違います。</div>';
+}
+function renderAdmin(){
+ let rows=Object.entries(data).map(([c,e])=>`<div class="status"><b>${esc(e.name)}</b>　${c}<br>${e.loan?'🔴 貸出中：'+esc(e.loan.borrower)+' / '+esc(e.loan.site):'🟢 使用可能'}</div>`).join('');
+ document.getElementById('dashboard').innerHTML=`<h3>現在の貸出状況</h3>${rows}`;
+}
+function resetData(){if(confirm('テストデータを初期状態に戻しますか？')){data=structuredClone(initial);save();renderAdmin()}}
+function esc(s){return String(s).replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]))}
+</script>
+</body>
+</html>
